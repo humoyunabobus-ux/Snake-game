@@ -1,0 +1,824 @@
+<!DOCTYPE html>
+<html lang="ru">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>Snake.io — Уникальные Никнеймы</title>
+    <style>
+        body, html {
+            margin: 0;
+            padding: 0;
+            overflow: hidden;
+            background-color: #050505;
+            font-family: 'Segoe UI', Tahoma, Geneva, Verdana, sans-serif;
+            color: white;
+            user-select: none;
+            touch-action: none;
+        }
+
+        canvas {
+            display: block;
+        }
+
+        /* Меню выбора сложности */
+        #menu-screen {
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: radial-gradient(circle, #151520 0%, #050505 100%);
+            display: flex;
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 20;
+        }
+
+        #menu-screen h1 {
+            font-size: 42px;
+            margin-bottom: 10px;
+            background: linear-gradient(45deg, #00ffcc, #0099ff);
+            -webkit-background-clip: text;
+            -webkit-text-fill-color: transparent;
+        }
+
+        .menu-p {
+            color: #888;
+            margin-bottom: 40px;
+            font-size: 16px;
+        }
+
+        .btn-group {
+            display: flex;
+            flex-direction: column;
+            gap: 15px;
+            width: 250px;
+        }
+
+        .menu-btn {
+            padding: 15px;
+            font-size: 18px;
+            font-weight: bold;
+            border: none;
+            border-radius: 25px;
+            cursor: pointer;
+            transition: 0.2s;
+            text-transform: uppercase;
+        }
+
+        #btn-easy { background: #4caf50; color: white; box-shadow: 0 0 15px rgba(76,175,80,0.4); }
+        #btn-medium { background: #ff9800; color: white; box-shadow: 0 0 15px rgba(255,152,0,0.4); }
+        #btn-hardcore { background: #b71c1c; color: white; box-shadow: 0 0 15px rgba(183,28,28,0.5); }
+
+        .menu-btn:hover {
+            transform: scale(1.05);
+            filter: brightness(1.2);
+        }
+
+        /* UI Игры */
+        #ui-layer {
+            position: absolute;
+            top: 20px;
+            left: 20px;
+            pointer-events: none;
+            display: none;
+        }
+
+        #score-box {
+            background: rgba(0, 0, 0, 0.6);
+            padding: 10px 20px;
+            border-radius: 20px;
+            font-size: 20px;
+            font-weight: bold;
+            border: 1px solid rgba(0, 255, 204, 0.3);
+        }
+
+        #attack-warning {
+            position: absolute;
+            top: 85px;
+            left: 20px;
+            background: rgba(183, 28, 28, 0.8);
+            color: white;
+            padding: 8px 15px;
+            border-radius: 10px;
+            font-weight: bold;
+            font-size: 14px;
+            display: none;
+            animation: pulse 1s infinite alternate;
+        }
+
+        @keyframes pulse {
+            0% { opacity: 0.6; }
+            100% { opacity: 1; }
+        }
+
+        #leaderboard {
+            position: absolute;
+            top: 20px;
+            right: 20px;
+            background: rgba(0, 0, 0, 0.7);
+            padding: 15px;
+            border-radius: 10px;
+            width: 220px;
+            border: 1px solid rgba(255, 255, 255, 0.1);
+            display: none;
+        }
+
+        #leaderboard h3 {
+            margin: 0 0 10px 0;
+            text-align: center;
+            color: #ffcc00;
+            font-size: 16px;
+            text-transform: uppercase;
+        }
+
+        .leader-item {
+            display: flex;
+            justify-content: space-between;
+            font-size: 14px;
+            margin-bottom: 5px;
+        }
+
+        .leader-item.player { color: #00ffcc; font-weight: bold; }
+
+        #game-over-screen {
+            display: none;
+            position: absolute;
+            top: 0; left: 0; width: 100%; height: 100%;
+            background: rgba(0, 0, 0, 0.85);
+            flex-direction: column;
+            align-items: center;
+            justify-content: center;
+            z-index: 10;
+        }
+
+        #game-over-screen h2 {
+            color: #ff3333;
+            font-size: 48px;
+            margin-bottom: 5px;
+        }
+
+        #final-score { font-size: 24px; margin-bottom: 30px; color: #aaa; }
+
+        #restart-btn {
+            background: linear-gradient(45deg, #00ffcc, #0099ff);
+            color: black;
+            border: none;
+            padding: 15px 40px;
+            font-size: 20px;
+            font-weight: bold;
+            cursor: pointer;
+            border-radius: 30px;
+        }
+
+        #hint {
+            position: absolute;
+            bottom: 20px;
+            left: 50%;
+            transform: translateX(-50%);
+            background: rgba(0,0,0,0.6);
+            padding: 10px 25px;
+            border-radius: 20px;
+            font-size: 16px;
+            color: #fff;
+            display: none;
+        }
+    </style>
+</head>
+<body>
+
+    <div id="menu-screen">
+        <h1>SNAKE.IO</h1>
+        <p class="menu-p">Вы начнете самым маленьким. Избегайте засад ботов!</p>
+        <div class="btn-group">
+            <button class="menu-btn" id="btn-easy" onclick="startGame('easy')">Легко (Easy)</button>
+            <button class="menu-btn" id="btn-medium" onclick="startGame('medium')">Средне (Medium)</button>
+            <button class="menu-btn" id="btn-hardcore" onclick="startGame('hardcore')">Хардкор (Hardcore)</button>
+        </div>
+    </div>
+
+    <div id="ui-layer">
+        <div id="score-box">Очки: <span id="score">0</span></div>
+        <div id="attack-warning">⚠️ БОТЫ АТАКУЮТ ВАС!</div>
+    </div>
+
+    <div id="leaderboard">
+        <h3>Лидеры Арены</h3>
+        <div id="leader-list"></div>
+    </div>
+
+    <div id="hint">Зажми, чтобы ускориться (Hold to be faster)</div>
+
+    <div id="game-over-screen">
+        <h2>ВЫ РАЗБИЛИСЬ!</h2>
+        <p id="final-score">Ваш результат: 0 очков</p>
+        <button id="restart-btn" onclick="backToMenu()">В меню</button>
+    </div>
+
+    <canvas id="gameCanvas"></canvas>
+
+    <script>
+        const canvas = document.getElementById("gameCanvas");
+        const ctx = canvas.getContext("2d");
+        const scoreElement = document.getElementById("score");
+        const leaderList = document.getElementById("leader-list");
+        const gameOverScreen = document.getElementById("game-over-screen");
+        const menuScreen = document.getElementById("menu-screen");
+        const finalScoreElement = document.getElementById("final-score");
+        const uiLayer = document.getElementById("ui-layer");
+        const leaderboardUi = document.getElementById("leaderboard");
+        const hintUi = document.getElementById("hint");
+        const attackWarning = document.getElementById("attack-warning");
+
+        const WORLD_SIZE = 3000;
+        
+        let player;
+        let bots = [];
+        let foods = [];
+        let mouse = { x: 0, y: 0 };
+        let isMouseDown = false;
+        let kingSnake = null;
+        let crownAnimationTimer = 0;
+        let currentDifficulty = 'easy';
+        let globalSpeedMultiplier = 1.5;
+
+        let nextAttackDelay = 0; 
+        let attackCycleTimer = 0;
+        let attackDurationTimer = 0;
+        let isAttackWaveActive = false;
+
+        function resizeCanvas() {
+            canvas.width = window.innerWidth;
+            canvas.height = window.innerHeight;
+        }
+        window.addEventListener('resize', resizeCanvas);
+        resizeCanvas();
+
+        function updateMousePos(clientX, clientY) {
+            mouse.x = clientX - canvas.width / 2;
+            mouse.y = clientY - canvas.height / 2;
+        }
+
+        window.addEventListener('mousemove', (e) => updateMousePos(e.clientX, e.clientY));
+        window.addEventListener('mousedown', () => isMouseDown = true);
+        window.addEventListener('mouseup', () => isMouseDown = false);
+
+        window.addEventListener('touchmove', (e) => {
+            if(e.touches.length > 0) updateMousePos(e.touches[0].clientX, e.touches[0].clientY);
+        }, { passive: false });
+        window.addEventListener('touchstart', (e) => {
+            isMouseDown = true;
+            if(e.touches.length > 0) updateMousePos(e.touches[0].clientX, e.touches[0].clientY);
+        });
+        window.addEventListener('touchend', () => isMouseDown = false);
+
+        function getRandomColor() {
+            return `hsl(${Math.floor(Math.random() * 360)}, 95%, 55%)`;
+        }
+
+        // Улучшенная генерация непредсказуемых никнеймов (Русские, Английские и разные стили)
+        function generateRandomName() {
+            const ruPrefixes = ["Злой", "Быстрый", "Мега", "Тот_Самый", "Дикий", "Кибер", "Черный", "Адский", "Борзый", "Супер"];
+            const ruNouns = ["Анаконда", "Червяк", "Нагибатор", "Про_Геймер", "Питон", "Чебурек", "Бабай", "Шрек", "Халк", "Крипер", "Кобра", "Танос"];
+            
+            const enPrefixes = ["Cyber", "Ghost", "Alpha", "Shadow", "Neon", "Turbo", "Dark", "Crazy", "Wild", "Silent", "Frost"];
+            const enNouns = ["Viper", "Stalker", "Worm", "Python", "Cobra", "Hunter", "Titan", "Glitch", "Reaper", "Striker", "Beast", "Ninja"];
+            
+            const singleNames = ["агент007", "alfa_007", "killerninja_9", "Борщ", "Terminator", "JohnWick", "Зевс", "Пельмень", "NoobMaster99", "Sniper", "Panda"];
+
+            // 4 разных стиля генерации никнейма
+            let style = Math.floor(Math.random() * 4);
+
+            if (style === 0) {
+                // Готовый одиночный никнейм из списка
+                return singleNames[Math.floor(Math.random() * singleNames.length)];
+            } else if (style === 1) {
+                // Русский стиль: Префикс + Существительное + опционально мелкое число
+                let p = ruPrefixes[Math.floor(Math.random() * ruPrefixes.length)];
+                let n = ruNouns[Math.floor(Math.random() * ruNouns.length)];
+                return Math.random() < 0.5 ? `${p}_${n}` : `${p}_${n}_${Math.floor(Math.random()*99)}`;
+            } else if (style === 2) {
+                // Английский стиль с нижним подчеркиванием и числом (например, alfa_007)
+                let p = enPrefixes[Math.floor(Math.random() * enPrefixes.length)].toLowerCase();
+                let n = enNouns[Math.floor(Math.random() * enNouns.length)].toLowerCase();
+                let num = Math.random() < 0.5 ? Math.floor(Math.random()*9) : "00" + Math.floor(Math.random()*9);
+                return `${p}_${n}_${num}`;
+            } else {
+                // Микс Английского префикса и Русского существительного (или наоборот)
+                let p = Math.random() < 0.5 ? enPrefixes[Math.floor(Math.random() * enPrefixes.length)] : ruPrefixes[Math.floor(Math.random() * ruPrefixes.length)];
+                let n = Math.random() < 0.5 ? ruNouns[Math.floor(Math.random() * ruNouns.length)] : enNouns[Math.floor(Math.random() * enNouns.length)];
+                return `${p}_${n}`;
+            }
+        }
+
+        function setRandomAttackDelay() {
+            nextAttackDelay = Math.floor(Math.random() * 600) + 600;
+        }
+
+        class Snake {
+            constructor(x, y, name, color, isBot = false, initialSize = 15) {
+                this.x = x;
+                this.y = y;
+                this.name = name;
+                this.color = color;
+                this.isBot = isBot;
+                this.score = 0;
+                this.angle = Math.random() * Math.PI * 2;
+                
+                this.radius = 12; 
+                this.segmentGap = 5; 
+                this.body = []; 
+                this.alive = true;
+
+                for (let i = 0; i < initialSize; i++) {
+                    this.body.push({ x: x, y: y });
+                }
+                if (initialSize > 15) {
+                    this.score = initialSize - 15;
+                }
+
+                this.botTargetX = x;
+                this.botTargetY = y;
+                this.botTimer = 0;
+                this.isBoosting = false;
+                this.isHunter = false; 
+            }
+
+            update() {
+                if (!this.alive) return;
+
+                let currentBaseSpeed = globalSpeedMultiplier;
+                this.isBoosting = this.isBot ? this.isBoosting : isMouseDown;
+                
+                if (this.isBoosting && this.body.length > 12) {
+                    this.speed = currentBaseSpeed * 1.8;
+                    if (Math.random() < 0.15) {
+                        let tail = this.body.pop();
+                        foods.push({
+                            x: tail.x + (Math.random() - 0.5) * 20,
+                            y: tail.y + (Math.random() - 0.5) * 20,
+                            color: this.color,
+                            size: Math.random() * 2 + 3
+                        });
+                        this.score = Math.max(0, this.score - 1);
+                    }
+                } else {
+                    this.speed = currentBaseSpeed;
+                }
+
+                if (this.isBot) {
+                    this.updateBotAI();
+                } else {
+                    if (Math.hypot(mouse.x, mouse.y) > 10) {
+                        this.angle = Math.atan2(mouse.y, mouse.x);
+                    }
+                }
+
+                this.x += Math.cos(this.angle) * this.speed;
+                this.y += Math.sin(this.angle) * this.speed;
+
+                if (this.x <= 10 || this.x >= WORLD_SIZE - 10 || this.y <= 10 || this.y >= WORLD_SIZE - 10) {
+                    this.die();
+                    return;
+                }
+
+                let prevX = this.x;
+                let prevY = this.y;
+                let len = this.body.length;
+                for (let i = 0; i < len; i++) {
+                    let seg = this.body[i];
+                    let dx = seg.x - prevX;
+                    let dy = seg.y - prevY;
+                    let dist = Math.hypot(dx, dy);
+
+                    if (dist > this.segmentGap) {
+                        let angle = Math.atan2(dy, dx);
+                        seg.x = prevX + Math.cos(angle) * this.segmentGap;
+                        seg.y = prevY + Math.sin(angle) * this.segmentGap;
+                    }
+                    prevX = seg.x;
+                    prevY = seg.y;
+                }
+            }
+
+            updateBotAI() {
+                this.botTimer--;
+
+                if (this.botTimer <= 0) {
+                    if (this.isHunter && player && player.alive && isAttackWaveActive) {
+                        let leadFactor = currentDifficulty === 'hardcore' ? 55 : 35; 
+                        this.botTargetX = player.x + Math.cos(player.angle) * leadFactor;
+                        this.botTargetY = player.y + Math.sin(player.angle) * leadFactor;
+                        
+                        this.isBoosting = currentDifficulty === 'hardcore' ? true : (Math.random() < 0.5);
+                        this.botTimer = 10; 
+                    } else {
+                        this.isBoosting = false;
+                        this.isHunter = false; 
+                        if (Math.random() < 0.7 && foods.length > 0) {
+                            let closest = foods[Math.floor(Math.random() * foods.length)];
+                            this.botTargetX = closest.x;
+                            this.botTargetY = closest.y;
+                        } else {
+                            this.botTargetX = this.x + (Math.random() - 0.5) * 500;
+                            this.botTargetY = this.y + (Math.random() - 0.5) * 500;
+                        }
+                        this.botTimer = Math.floor(Math.random() * 80) + 40;
+                    }
+                }
+
+                let targetAngle = Math.atan2(this.botTargetY - this.y, this.botTargetX - this.x);
+                let diff = targetAngle - this.angle;
+                while (diff < -Math.PI) diff += Math.PI * 2;
+                while (diff > Math.PI) diff -= Math.PI * 2;
+                
+                let turnSpeed = currentDifficulty === 'hardcore' ? 0.14 : (currentDifficulty === 'medium' ? 0.09 : 0.05);
+                this.angle += diff * turnSpeed;
+            }
+
+            draw(camX, camY) {
+                if (!this.alive) return;
+
+                let len = this.body.length;
+                let step = len > 100 ? 2 : 1; 
+
+                for (let i = len - 1; i >= 0; i -= step) {
+                    let screenX = this.body[i].x - camX + canvas.width / 2;
+                    let screenY = this.body[i].y - camY + canvas.height / 2;
+
+                    if (screenX >= -30 && screenX <= canvas.width + 30 && screenY >= -30 && screenY <= canvas.height + 30) {
+                        ctx.beginPath();
+                        ctx.arc(screenX, screenY, this.radius, 0, Math.PI * 2);
+                        ctx.fillStyle = this.color;
+                        ctx.fill();
+                        ctx.closePath();
+                    }
+                }
+
+                let headX = this.x - camX + canvas.width / 2;
+                let headY = this.y - camY + canvas.height / 2;
+                
+                ctx.beginPath();
+                ctx.arc(headX, headY, this.radius + 1, 0, Math.PI * 2);
+                ctx.fillStyle = this.isHunter ? "#ff1744" : "#ffffff"; 
+                ctx.fill();
+                ctx.closePath();
+
+                let eyeX1 = headX + Math.cos(this.angle + 0.5) * 6;
+                let eyeY1 = headY + Math.sin(this.angle + 0.5) * 6;
+                let eyeX2 = headX + Math.cos(this.angle - 0.5) * 6;
+                let eyeY2 = headY + Math.sin(this.angle - 0.5) * 6;
+
+                ctx.fillStyle = "#000000";
+                ctx.beginPath(); ctx.arc(eyeX1, eyeY1, 3, 0, Math.PI*2); ctx.fill(); ctx.closePath();
+                ctx.beginPath(); ctx.arc(eyeX2, eyeY2, 3, 0, Math.PI*2); ctx.fill(); ctx.closePath();
+
+                ctx.fillStyle = "rgba(255,255,255,0.7)";
+                ctx.font = "12px sans-serif";
+                ctx.textAlign = "center";
+                ctx.fillText(this.name, headX, headY - 22);
+
+                if (this === kingSnake) {
+                    let bounce = Math.sin(crownAnimationTimer * 0.1) * 3;
+                    let cx = headX;
+                    let cy = headY - 38 + bounce;
+
+                    ctx.fillStyle = "#ffcc00";
+                    ctx.strokeStyle = "#ffe57f";
+                    ctx.lineWidth = 1.5;
+                    ctx.beginPath();
+                    ctx.moveTo(cx - 12, cy + 6);
+                    ctx.lineTo(cx - 15, cy - 8);
+                    ctx.lineTo(cx - 6, cy - 2);
+                    ctx.lineTo(cx, cy - 14);
+                    ctx.lineTo(cx + 6, cy - 2);
+                    ctx.lineTo(cx + 15, cy - 8);
+                    ctx.lineTo(cx + 12, cy + 6);
+                    ctx.closePath();
+                    ctx.fill();
+                    ctx.stroke();
+                }
+            }
+
+            grow(amount) {
+                this.score += amount;
+                for (let i = 0; i < amount; i++) {
+                    let last = this.body[this.body.length - 1] || { x: this.x, y: this.y };
+                    this.body.push({ x: last.x, y: last.y });
+                }
+            }
+
+            die() {
+                this.alive = false;
+                this.body.forEach((seg, idx) => {
+                    if (idx % 3 === 0) {
+                        foods.push({
+                            x: seg.x + (Math.random() - 0.5) * 15,
+                            y: seg.y + (Math.random() - 0.5) * 15,
+                            color: this.color,
+                            size: Math.random() * 4 + 4
+                        });
+                    }
+                });
+
+                if (!this.isBot) {
+                    finalScoreElement.innerText = "Ваш результат: " + this.score + " очков";
+                    gameOverScreen.style.display = "flex";
+                    attackWarning.style.display = "none";
+                }
+            }
+        }
+
+        function spawnFood(count = 1) {
+            const colors = ['#ff3366', '#33ff66', '#3366ff', '#ffff33', '#ff33ff', '#33ffff', '#ff9933'];
+            for (let i = 0; i < count; i++) {
+                foods.push({
+                    x: Math.random() * (WORLD_SIZE - 40) + 20,
+                    y: Math.random() * (WORLD_SIZE - 40) + 20,
+                    color: colors[Math.floor(Math.random() * colors.length)],
+                    size: Math.random() * 2 + 3
+                });
+            }
+        }
+
+        function manageAttackWaves() {
+            if (currentDifficulty === 'easy' || !player || !player.alive) return;
+
+            attackCycleTimer++;
+            if (!isAttackWaveActive && attackCycleTimer >= nextAttackDelay) {
+                isAttackWaveActive = true;
+                attackDurationTimer = 0;
+                attackCycleTimer = 0;
+
+                bots.forEach(b => b.isHunter = false);
+                let sortedByDistance = [...bots].filter(b => b.alive);
+                sortedByDistance.sort((a, b) => Math.hypot(a.x - player.x, a.y - player.y) - Math.hypot(b.x - player.x, b.y - player.y));
+
+                let huntersCount = currentDifficulty === 'medium' ? 2 : 3;
+                for (let i = 0; i < Math.min(huntersCount, sortedByDistance.length); i++) {
+                    sortedByDistance[i].isHunter = true;
+                    sortedByDistance[i].botTimer = 0; 
+                }
+
+                attackWarning.style.display = "block";
+            }
+
+            if (isAttackWaveActive) {
+                attackDurationTimer++;
+                if (attackDurationTimer >= 900) { 
+                    isAttackWaveActive = false;
+                    bots.forEach(b => b.isHunter = false);
+                    attackWarning.style.display = "none";
+                    setRandomAttackDelay(); 
+                }
+            }
+        }
+
+        function startGame(difficulty) {
+            currentDifficulty = difficulty;
+            menuScreen.style.display = "none";
+            gameOverScreen.style.display = "none";
+            uiLayer.style.display = "block";
+            leaderboardUi.style.display = "block";
+            hintUi.style.display = "block";
+            attackWarning.style.display = "none";
+
+            attackCycleTimer = 0;
+            isAttackWaveActive = false;
+            setRandomAttackDelay(); 
+
+            if (difficulty === 'easy') globalSpeedMultiplier = 1.4;
+            if (difficulty === 'medium') globalSpeedMultiplier = 2.0;
+            if (difficulty === 'hardcore') globalSpeedMultiplier = 2.8;
+
+            isMouseDown = false;
+            kingSnake = null;
+            
+            player = new Snake(WORLD_SIZE / 2, WORLD_SIZE / 2, "Вы", "#00ffcc", false, 15);
+            
+            foods = [];
+            spawnFood(300); 
+
+            bots = [];
+            
+            // Заполняем арену 12 ботами с непредсказуемыми стилями никнеймов
+            for (let i = 0; i < 12; i++) {
+                let rx = Math.random() * (WORLD_SIZE - 200) + 100;
+                let ry = Math.random() * (WORLD_SIZE - 200) + 100;
+                if (Math.hypot(player.x - rx, player.y - ry) < 300) continue;
+                
+                let randomSize = i === 0 ? 180 : Math.floor(Math.random() * 80) + 30; 
+                bots.push(new Snake(rx, ry, generateRandomName(), getRandomColor(), true, randomSize));
+            }
+
+            updateLeaderboard();
+        }
+
+        function backToMenu() {
+            gameOverScreen.style.display = "none";
+            uiLayer.style.display = "none";
+            leaderboardUi.style.display = "none";
+            hintUi.style.display = "none";
+            menuScreen.style.display = "flex";
+        }
+
+        function drawGrid(camX, camY) {
+            ctx.strokeStyle = "#121212";
+            ctx.lineWidth = 1;
+            
+            let offsetX = canvas.width / 2 - camX;
+            let offsetY = canvas.height / 2 - camY;
+
+            let startX = Math.floor(Math.max(0, camX - canvas.width / 2) / 60) * 60;
+            let endX = Math.min(WORLD_SIZE, camX + canvas.width / 2);
+            let startY = Math.floor(Math.max(0, camY - canvas.height / 2) / 60) * 60;
+            let endY = Math.min(WORLD_SIZE, camY + canvas.height / 2);
+
+            for (let x = startX; x <= endX; x += 60) {
+                ctx.beginPath(); ctx.moveTo(x + offsetX, Math.max(0, startY) + offsetY); ctx.lineTo(x + offsetX, Math.min(WORLD_SIZE, endY) + offsetY); ctx.stroke();
+            }
+            for (let y = startY; y <= endY; y += 60) {
+                ctx.beginPath(); ctx.moveTo(Math.max(0, startX) + offsetX, y + offsetY); ctx.lineTo(Math.min(WORLD_SIZE, endX) + offsetX, y + offsetY); ctx.stroke();
+            }
+
+            ctx.strokeStyle = "#b71c1c";
+            ctx.lineWidth = 8;
+            ctx.strokeRect(offsetX, offsetY, WORLD_SIZE, WORLD_SIZE);
+        }
+
+        function checkCollisions() {
+            if (!player || !player.alive) return;
+
+            let allSnakes = [player, ...bots].filter(s => s.alive);
+
+            allSnakes.forEach(snake => {
+                allSnakes.forEach(target => {
+                    if (snake === target) return;
+
+                    let approxDist = Math.hypot(snake.x - target.x, snake.y - target.y);
+                    if (approxDist > target.body.length * 5 + 50) return; 
+
+                    let bodyLen = target.body.length;
+                    for(let i = 0; i < bodyLen; i += 2) {
+                        let seg = target.body[i];
+                        if (Math.hypot(snake.x - seg.x, snake.y - seg.y) < snake.radius + target.radius - 2) {
+                            snake.die();
+                            break;
+                        }
+                    }
+                });
+            });
+        }
+
+        function drawKingArrow() {
+            if (!kingSnake || !kingSnake.alive || kingSnake === player || !player.alive) return;
+
+            let screenX = kingSnake.x - player.x + canvas.width / 2;
+            let screenY = kingSnake.y - player.y + canvas.height / 2;
+
+            if (screenX < 0 || screenX > canvas.width || screenY < 0 || screenY > canvas.height) {
+                let angleToKing = Math.atan2(kingSnake.y - player.y, kingSnake.x - player.x);
+                let arrowDist = player.radius + 30;
+                let ax = (canvas.width / 2) + Math.cos(angleToKing) * arrowDist;
+                let ay = (canvas.height / 2) + Math.sin(angleToKing) * arrowDist;
+
+                ctx.save(); ctx.translate(ax, ay); ctx.rotate(angleToKing);
+                ctx.fillStyle = "#ffcc00";
+                ctx.beginPath(); ctx.moveTo(8, 0); ctx.lineTo(-6, -6); ctx.lineTo(-2, 0); ctx.lineTo(-6, 6); ctx.closePath(); ctx.fill();
+                ctx.restore();
+            }
+        }
+
+        function drawMinimap() {
+            let mapSize = 130;
+            let padding = 20;
+            let mapX = canvas.width - mapSize - padding;
+            let mapY = canvas.height - mapSize - padding;
+
+            ctx.fillStyle = "rgba(0, 0, 0, 0.7)";
+            ctx.fillRect(mapX, mapY, mapSize, mapSize);
+            ctx.strokeStyle = "rgba(255, 255, 255, 0.15)";
+            ctx.strokeRect(mapX, mapY, mapSize, mapSize);
+
+            bots.forEach(bot => {
+                if (!bot.alive) return;
+                let bx = mapX + (bot.x / WORLD_SIZE) * mapSize;
+                let by = mapY + (bot.y / WORLD_SIZE) * mapSize;
+                ctx.fillStyle = bot === kingSnake ? "#ffcc00" : (bot.isHunter ? "#ff1744" : "#ff5722");
+                ctx.fillRect(bx - 1, by - 1, bot === kingSnake ? 3 : 2, bot === kingSnake ? 3 : 2);
+            });
+
+            if (player && player.alive) {
+                let px = mapX + (player.x / WORLD_SIZE) * mapSize;
+                let py = mapY + (player.y / WORLD_SIZE) * mapSize;
+                ctx.fillStyle = "#00ffcc";
+                ctx.beginPath(); ctx.arc(px, py, 2.5, 0, Math.PI*2); ctx.fill();
+            }
+        }
+
+        function updateLeaderboard() {
+            let allSnakes = [];
+            if (player && player.alive) allSnakes.push(player);
+            bots.forEach(b => { if(b.alive) allSnakes.push(b); });
+            
+            allSnakes.sort((a, b) => b.score - a.score);
+
+            if (allSnakes.length > 0) kingSnake = allSnakes[0];
+
+            leaderList.innerHTML = "";
+            allSnakes.slice(0, 5).forEach((snake, index) => {
+                let div = document.createElement("div");
+                div.className = "leader-item" + (snake === player ? " player" : "");
+                let crownTag = index === 0 ? "👑 " : "";
+                div.innerHTML = `<span>${crownTag}${index + 1}. ${snake.name}</span><span>${snake.score}</span>`;
+                leaderList.appendChild(div);
+            });
+        }
+
+        function loop() {
+            crownAnimationTimer++;
+            
+            if (menuScreen.style.display === "flex") {
+                requestAnimationFrame(loop);
+                return;
+            }
+
+            ctx.fillStyle = "#09090b";
+            ctx.fillRect(0, 0, canvas.width, canvas.height);
+
+            let camX = player ? player.x : WORLD_SIZE/2;
+            let camY = player ? player.y : WORLD_SIZE/2;
+
+            drawGrid(camX, camY);
+            manageAttackWaves();
+
+            if (foods.length < 220) spawnFood(5); 
+            
+            let foodsLen = foods.length;
+            for(let index = foodsLen - 1; index >= 0; index--) {
+                let food = foods[index];
+                let screenX = food.x - camX + canvas.width / 2;
+                let screenY = food.y - camY + canvas.height / 2;
+
+                if (screenX >= -10 && screenX <= canvas.width + 10 && screenY >= -10 && screenY <= canvas.height + 10) {
+                    ctx.beginPath();
+                    ctx.arc(screenX, screenY, food.size, 0, Math.PI * 2);
+                    ctx.fillStyle = food.color;
+                    ctx.fill();
+                    ctx.closePath();
+                }
+
+                if (player && player.alive && Math.hypot(player.x - food.x, player.y - food.y) < player.radius + food.size) {
+                    player.grow(1);
+                    foods.splice(index, 1);
+                    continue;
+                }
+
+                let foodEaten = false;
+                let botsLen = bots.length;
+                for(let b=0; b<botsLen; b++) {
+                    let bot = bots[b];
+                    if (bot.alive && Math.hypot(bot.x - food.x, bot.y - food.y) < bot.radius + food.size) {
+                        bot.grow(1);
+                        foods.splice(index, 1);
+                        foodEaten = true;
+                        break;
+                    }
+                }
+                if (foodEaten) continue;
+            }
+
+            bots = bots.filter(b => b.alive);
+            bots.forEach(bot => {
+                bot.update();
+                bot.draw(camX, camY);
+            });
+
+            checkCollisions();
+
+            if (bots.length < 11) {
+                let rx = Math.random() * (WORLD_SIZE - 200) + 100;
+                let ry = Math.random() * (WORLD_SIZE - 200) + 100;
+                if (player && Math.hypot(player.x - rx, player.y - ry) > 450) {
+                    let randomSize = Math.floor(Math.random() * 60) + 20; 
+                    // Мертвые боты перерождаются с новыми непредсказуемыми никами
+                    bots.push(new Snake(rx, ry, generateRandomName(), getRandomColor(), true, randomSize));
+                }
+            }
+
+            if (player && player.alive) {
+                player.update();
+                player.draw(camX, camY);
+                scoreElement.innerText = player.score;
+                drawKingArrow();
+            }
+
+            drawMinimap();
+            
+            if (crownAnimationTimer % 30 === 0) updateLeaderboard(); 
+
+            requestAnimationFrame(loop);
+        }
+
+        loop();
+    </script>
+</body>
+</html>
